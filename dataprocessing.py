@@ -42,7 +42,6 @@ def load_data_bananas(batch_size):
     """加载香蕉检测数据集"""
     train_iter = torch.utils.data.DataLoader(BananasDataset(is_train=True),
                                              batch_size, shuffle=True)
-    # val_iter = torch.utils.data.DataLoader(BananasDataset(is_train=False),
-    #                                        batch_size)
-    # return train_iter, val_iter
-    return train_iter
+    val_iter = torch.utils.data.DataLoader(BananasDataset(is_train=False),
+                                           batch_size)
+    return train_iter, val_iter

@@ -5,14 +5,14 @@ from train import train_fn
 import model
 
 batch_size = 32
-train_data= load_data_bananas(batch_size)
+train_data,valid_data= load_data_bananas(batch_size)
 
 model = TinySSD(num_classes=2)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 #定义优化器
-trainer = torch.optim.SGD(model.parameters(), lr=0.2,
+trainer = torch.optim.SGD(model.parameters(), lr=0.001,
                             weight_decay=5e-4)
 
 #定义损失函数
@@ -28,7 +28,14 @@ def calc_loss(cls_preds, cls_labels, bbox_preds,
     return cls + bbox
 
 #------------------训练模型----------------------
-num_epochs = 10
+num_epochs = 100
 model.to(device)
-train_fn(num_epochs, model, train_data, trainer, calc_loss, device)
+train_fn(num_epochs, model, train_data, valid_data,trainer, calc_loss, device)
+
+
+
+
+#------------------预测模型----------------------
+
+
 
