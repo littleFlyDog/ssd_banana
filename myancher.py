@@ -92,7 +92,7 @@ def show_bboxes(ax, bboxes, labels=None, colors=None):
     colors = _make_list(colors, ['b', 'g', 'r', 'm', 'c'])
     for i, bbox in enumerate(bboxes):
         color = colors[i % len(colors)]
-        rect = bbox_to_rect(bbox.detach().numpy(), color)
+        rect = bbox_to_rect(bbox.detach().cpu().numpy(), color)
         ax.add_patch(rect)
         if labels and len(labels) > i:
             text_color = 'k' if color == 'w' else 'w'
@@ -164,13 +164,14 @@ def offset_boxes(anchors, assigned_bb, eps=1e-6):
 
 
 #返回[照片数，锚框数*4个偏移量]，[照片数，锚框数*四个掩码(连续4个1或者0)]，[照片数，锚框数类别标签]
-def multibox_target(anchors, labels):#labels的shpae为(照片数，真实边界框数，5)
+def multibox_target(anchors, labels):#anchors的shape为(1，锚框数，4)，labels的shpae为(照片数，真实边界框数，5)
     """使用真实边界框标记锚框"""
     batch_size, anchors = labels.shape[0], anchors.squeeze(0)
     batch_offset, batch_mask, batch_class_labels = [], [], []
     device, num_anchors = anchors.device, anchors.shape[0]
     for i in range(batch_size):
         label = labels[i, :, :]
+        #anchors_bbox_map的shape为(锚框数，)，每个值为对应锚框分配的真实边界框索引，-1表示没有分配，即与边界框的iou都小于阈值，可视为背景
         anchors_bbox_map = assign_anchor_to_bbox(
             label[:, 1:], anchors, device)
         bbox_mask = ((anchors_bbox_map >= 0).float().unsqueeze(-1)).repeat(
@@ -182,15 +183,15 @@ def multibox_target(anchors, labels):#labels的shpae为(照片数，真实边界
                                   device=device)
         # 使用真实边界框来标记锚框的类别。
         # 如果一个锚框没有被分配，标记其为背景（值为零）
-        indices_true = torch.nonzero(anchors_bbox_map >= 0)
-        bb_idx = anchors_bbox_map[indices_true]
-        class_labels[indices_true] = label[bb_idx, 0].long() + 1
+        indices_true = torch.nonzero(anchors_bbox_map >= 0)#非背景锚框的索引
+        bb_idx = anchors_bbox_map[indices_true]#对应的真实边界框索引
+        class_labels[indices_true] = label[bb_idx, 0].long() + 1#类别标签，背景为0，前景类别从1开始
         assigned_bb[indices_true] = label[bb_idx, 1:]
         # 偏移量转换
         offset = offset_boxes(anchors, assigned_bb) * bbox_mask
         batch_offset.append(offset.reshape(-1))
         batch_mask.append(bbox_mask.reshape(-1))
-        batch_class_labels.append(class_labels)
+        batch_class_labels.append(class_labels)#这里使得背景成为0，前景类别从1开始
     bbox_offset = torch.stack(batch_offset)
     bbox_mask = torch.stack(batch_mask)
     class_labels = torch.stack(batch_class_labels)
@@ -234,8 +235,8 @@ def nms(boxes, scores, iou_threshold):
         B = B[inds + 1]
     return torch.tensor(keep, device=boxes.device)
 
-#最终函数
-def multibox_detection(cls_probs, offset_preds, anchors, nms_threshold=0.5,
+#最终函数,cls_probs是[b_s,class,anchor]，且为概率
+def multibox_detection(cls_probs, offset_preds, anchors, nms_threshold=0.2,
                        pos_threshold=0.009999999):
     """使用非极大值抑制来预测边界框"""
     device, batch_size = cls_probs.device, cls_probs.shape[0]
@@ -266,6 +267,7 @@ def multibox_detection(cls_probs, offset_preds, anchors, nms_threshold=0.5,
                                predicted_bb), dim=1)
         out.append(pred_info)
     return torch.stack(out)
+#返回[batch_size, num_anchors, 6]  [class_id, confidence, xmin, ymin, xmax, ymax]，且每个class_id>=0
 
 #----------------------多尺度目标检测------------------------
 # image_array=plt.imread('catdog.jpg')

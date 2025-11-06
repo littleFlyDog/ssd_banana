@@ -4,6 +4,7 @@
 *.pth
 logs/
 data/
+*.png
 
 
 ### Python ###
