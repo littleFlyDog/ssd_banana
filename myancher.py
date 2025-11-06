@@ -1,9 +1,20 @@
+#用于对于锚框的生成，分配，偏移量计算，非极大值抑制等操作
+
 import torch
 import matplotlib.pyplot as plt
 
-from d2l import torch as d2l
 
 
+def bbox_to_rect(bbox, color):
+    """Convert bounding box to matplotlib format.
+
+    Defined in :numref:`sec_bbox`"""
+    # Convert the bounding box (upper-left x, upper-left y, lower-right x,
+    # lower-right y) format to the matplotlib format: ((upper-left x,
+    # upper-left y), width, height)
+    return plt.Rectangle(
+        xy=(bbox[0], bbox[1]), width=bbox[2]-bbox[0], height=bbox[3]-bbox[1],
+        fill=False, edgecolor=color, linewidth=2)
 def box_corner_to_center(boxes):
     """Convert from (upper-left, lower-right) to (center, width, height).
 
@@ -13,7 +24,7 @@ def box_corner_to_center(boxes):
     cy = (y1 + y2) / 2
     w = x2 - x1
     h = y2 - y1
-    boxes = d2l.stack((cx, cy, w, h), axis=-1)
+    boxes = torch.stack((cx, cy, w, h), axis=-1)
     return boxes
 def box_center_to_corner(boxes):
     """Convert from (center, width, height) to (upper-left, lower-right).
@@ -24,7 +35,7 @@ def box_center_to_corner(boxes):
     y1 = cy - 0.5 * h
     x2 = cx + 0.5 * w
     y2 = cy + 0.5 * h
-    boxes = d2l.stack((x1, y1, x2, y2), axis=-1)
+    boxes = torch.stack((x1, y1, x2, y2), axis=-1)
     return boxes
 
 # 锚框生成
@@ -81,7 +92,7 @@ def show_bboxes(ax, bboxes, labels=None, colors=None):
     colors = _make_list(colors, ['b', 'g', 'r', 'm', 'c'])
     for i, bbox in enumerate(bboxes):
         color = colors[i % len(colors)]
-        rect = d2l.bbox_to_rect(bbox.detach().numpy(), color)
+        rect = bbox_to_rect(bbox.detach().numpy(), color)
         ax.add_patch(rect)
         if labels and len(labels) > i:
             text_color = 'k' if color == 'w' else 'w'
@@ -112,7 +123,7 @@ def box_iou(boxes1, boxes2):
     inter_areas = inters[:, :, 0] * inters[:, :, 1]
     union_areas = areas1[:, None] + areas2 - inter_areas
     return inter_areas / union_areas
-#分配锚框
+#分配锚框，输入是标注的真实边界框和锚框返回一个张量，张量size为总锚框数，每个值为对应锚框分配的真实边界框索引，-1表示没有分配
 def assign_anchor_to_bbox(ground_truth, anchors, device, iou_threshold=0.5):
     """将最接近的真实边界框分配给锚框"""
     num_anchors, num_gt_boxes = anchors.shape[0], ground_truth.shape[0]
@@ -152,8 +163,8 @@ def offset_boxes(anchors, assigned_bb, eps=1e-6):
 
 
 
-#返回[照片数，锚框书*4个偏移量]，[照片数，锚框数*四个掩码(连续4个1或者0)]，[照片数，锚框数类别标签]
-def multibox_target(anchors, labels):
+#返回[照片数，锚框数*4个偏移量]，[照片数，锚框数*四个掩码(连续4个1或者0)]，[照片数，锚框数类别标签]
+def multibox_target(anchors, labels):#labels的shpae为(照片数，真实边界框数，5)
     """使用真实边界框标记锚框"""
     batch_size, anchors = labels.shape[0], anchors.squeeze(0)
     batch_offset, batch_mask, batch_class_labels = [], [], []
@@ -183,16 +194,11 @@ def multibox_target(anchors, labels):
     bbox_offset = torch.stack(batch_offset)
     bbox_mask = torch.stack(batch_mask)
     class_labels = torch.stack(batch_class_labels)
-    return (bbox_offset, bbox_mask, class_labels)
+    return (bbox_offset, bbox_mask, class_labels)#bbox_offset的shape为(照片数，锚框数*4)，bbox_mask的shape为(照片数，锚框数*4)，class_labels的shape为(照片数，锚框数)
 
 
-#对以上函数的一个测试
-image_array=plt.imread('catdog.jpg')
-fig,ax=plt.subplots()
-ax.imshow(image_array)
-ax.axis('off')
-h,w=image_array.shape[0:2]
-bbox_scale=torch.tensor((w,h,w,h))
+
+
 # ground_truth = torch.tensor([[0, 0.1, 0.08, 0.52, 0.92],
 #                          [1, 0.55, 0.2, 0.9, 0.88]])
 # anchors = torch.tensor([[0, 0.1, 0.2, 0.3], [0.15, 0.2, 0.4, 0.4],
@@ -261,20 +267,24 @@ def multibox_detection(cls_probs, offset_preds, anchors, nms_threshold=0.5,
         out.append(pred_info)
     return torch.stack(out)
 
-anchors = torch.tensor([[0.1, 0.08, 0.52, 0.92], [0.08, 0.2, 0.56, 0.95],
-                      [0.15, 0.3, 0.62, 0.91], [0.55, 0.2, 0.9, 0.88]])
-offset_preds = torch.tensor([0] * anchors.numel())
-cls_probs = torch.tensor([[0] * 4,  # 背景的预测概率
-                      [0.9, 0.8, 0.7, 0.1],  # 狗的预测概率
-                      [0.1, 0.2, 0.3, 0.9]])  # 猫的预测概率
-show_bboxes(ax, anchors * bbox_scale,
-            ['dog=0.9', 'dog=0.8', 'dog=0.7', 'cat=0.9'])
-plt.show()
-output = multibox_detection(cls_probs.unsqueeze(dim=0),
-                            offset_preds.unsqueeze(dim=0),
-                            anchors.unsqueeze(dim=0),
-                            nms_threshold=0.5)
-print(output)
+#----------------------多尺度目标检测------------------------
+# image_array=plt.imread('catdog.jpg')
+# fig,ax=plt.subplots() 
+# ax.imshow(image_array)
+# ax.axis('off')
+# h,w=image_array.shape[0:2]
+
+
+def display_ancher(fmap_h,fmap_w,s):
+    fmap=torch.zeros((1,3,fmap_h,fmap_w))
+    #anchors的输出shape[1,锚框数，4]
+    anchors=multibox_prior(fmap,sizes=s,ratios=[1,2,0.5])
+    bbox_scale=torch.tensor((w,h,w,h))
+    show_bboxes(ax, anchors[0]*bbox_scale)
+
+#display演示
+# display_ancher(1,1,[0.8])
+# plt.show()
 # import matplotlib.pyplot as plt
 # import numpy as np
 
@@ -315,7 +325,7 @@ print(output)
 # plt.show()
 
 
-# fig = d2l.plt.imshow(img)
+# 
 
 # a=torch.tensor([[1,0,10],
 #                 [3,4,5],
