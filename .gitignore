@@ -5,6 +5,7 @@
 logs/
 data/
 *.png
+wandb/
 
 
 ### Python ###

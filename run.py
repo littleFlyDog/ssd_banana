@@ -5,17 +5,22 @@ from train import train_fn
 import model
 import torchvision
 from predict import predict_and_display
-batch_size = 32
-train_data,valid_data= load_data_bananas(batch_size)
+
 
 model = TinySSD(num_classes=2)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-
+#超参数设置
+config={
+    "batch_size": 32,
+    "learning_rate": 0.19,
+    "weight_decay": 5e-4,
+    "num_epochs": 100,
+}
+train_data,valid_data= load_data_bananas(config["batch_size"])
 #定义优化器
-lr=0.14
+lr=config["learning_rate"]
 trainer = torch.optim.SGD(model.parameters(), lr=lr,
-                            weight_decay=5e-4)
+                            weight_decay=config["weight_decay"])
 
 #定义损失函数
 cls_loss = torch.nn.CrossEntropyLoss(reduction='none')
@@ -30,15 +35,15 @@ def calc_loss(cls_preds, cls_labels, bbox_preds,
     return cls + bbox
 
 #------------------训练模型----------------------
-# num_epochs = 100
-# model.to(device)
-# train_fn(num_epochs, model, train_data, valid_data,trainer, calc_loss, device)
+num_epochs = config["num_epochs"]
+model.to(device)
+train_fn(num_epochs, model, train_data, valid_data,trainer, calc_loss, device,config)
 
 
 
 
 #------------------预测模型----------------------
-model.load_state_dict(torch.load('best_model_4_0.14.pth'))
-img_torch = torchvision.io.read_image('data/bananas_test/images/97.png').unsqueeze(0).float()
-model.to(device)
-predict_and_display(img_torch,model,0.9,device)
+# model.load_state_dict(torch.load('best_model_4_0.14.pth'))
+# img_torch = torchvision.io.read_image('data/bananas_test/images/94.png').unsqueeze(0).float()
+# model.to(device)
+# predict_and_display(img_torch,model,0.9,device)

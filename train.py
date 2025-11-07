@@ -1,8 +1,12 @@
 
+from datetime import datetime
+
+from numpy import save
 from myancher import multibox_target
 import torch
 import tqdm
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
+import wandb
 
 #全部样本精度和边界框绝对误差
 
@@ -45,8 +49,9 @@ def eval_positive_fn(model, valid_iter, device):
     avg_bbox_mae = bbox_mae_sum / total_positives if total_positives > 0 else 0.0
     return avg_cls_acc, avg_bbox_mae
 
-def train_fn(num_epochs, model, train_iter, valid_iter,trainer, calc_loss, device):    
-    writer=SummaryWriter('logs/logs')  
+def train_fn(num_epochs, model, train_iter, valid_iter,trainer, calc_loss, device,config):    
+    # writer=SummaryWriter('logs/logs')  
+    wandb.init(project="TinySSD",name=datetime.now().strftime("%Y-%m-%d_%H:%M:%S"),config=config,save_code=True)
     best_acc=0.0
     patience=10
     for epoch in range(num_epochs):
@@ -89,10 +94,21 @@ def train_fn(num_epochs, model, train_iter, valid_iter,trainer, calc_loss, devic
             patience-=1
             if patience==0:
                 print("Early stopping...in epoch {}".format(epoch+1))
+                arti_model=wandb.Artifact('best_model','model')
+                arti_model.add_file('best_model.pth')
+                wandb.log_artifact(arti_model)  
                 break
-        writer.add_scalar("train_loss", avg_loss, epoch)
-        writer.add_scalars("acc_mae",{'valid_cls_acc':avg_cls_acc,'avg_bbox_mae':avg_bbox_mae},epoch)
+        wandb.log({
+            "train_loss": avg_loss,
+            "valid_cls_acc": avg_cls_acc,
+            "valid_bbox_mae": avg_bbox_mae,
+            "best_acc": best_acc,
+            "stop_epoch": epoch
+        },step=epoch)
+        # writer.add_scalar("train_loss", avg_loss, epoch)
+        # writer.add_scalars("acc_mae",{'valid_cls_acc':avg_cls_acc,'avg_bbox_mae':avg_bbox_mae},epoch)
 
 
-    writer.close()
+    # writer.close()
+    wandb.finish()
     model.load_state_dict(torch.load('best_model.pth'))
