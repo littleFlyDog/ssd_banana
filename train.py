@@ -112,3 +112,8 @@ def train_fn(num_epochs, model, train_iter, valid_iter,trainer, calc_loss, devic
     # writer.close()
     wandb.finish()
     model.load_state_dict(torch.load('best_model.pth'))
+
+
+
+
+    #用于测试2222222-------------------------

@@ -12,7 +12,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #超参数设置
 config={
     "batch_size": 32,
-    "learning_rate": 0.19,
+    "learning_rate": 0.01,
     "weight_decay": 5e-4,
     "num_epochs": 100,
 }
