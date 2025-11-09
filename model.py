@@ -72,6 +72,27 @@ class TinySSD(nn.Module):
                                                     num_anchors, num_classes))
             setattr(self, f'bbox_{i}', bbox_predictor(idx_to_in_channels[i],
                                                       num_anchors))
+                # ******** 新增初始化调用 ********
+        self.apply(self._init_weights)
+
+    # ******** 新增初始化方法 ********
+    def _init_weights(self, m):
+        """
+        初始化网络权重。
+        m: 代表网络中的一个模块 (module)
+        """
+        if isinstance(m, nn.Conv2d):
+            # 对卷积层使用 Kaiming 初始化
+            # mode='fan_in' 保留前向传播中权重的方差大小
+            # nonlinearity='relu' 指定激活函数，PyTorch会据此调整标准差
+            nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
+            if m.bias is not None:
+                # 将偏置初始化为0
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, nn.BatchNorm2d):
+            # 对 BatchNorm 层的权重初始化为1，偏置初始化为0
+            nn.init.constant_(m.weight, 1)
+            nn.init.constant_(m.bias, 0)
 
     def forward(self, X):
         anchors, cls_preds, bbox_preds = [None] * 5, [None] * 5, [None] * 5

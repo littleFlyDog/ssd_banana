@@ -49,15 +49,15 @@ def eval_positive_fn(model, valid_iter, device):
     avg_bbox_mae = bbox_mae_sum / total_positives if total_positives > 0 else 0.0
     return avg_cls_acc, avg_bbox_mae
 
-def train_fn(num_epochs, model, train_iter, valid_iter,trainer, calc_loss, device,config):    
+def train_fn( model, train_iter, valid_iter,trainer, calc_loss, device,config):    
     # writer=SummaryWriter('logs/logs')  
     wandb.init(project="TinySSD",name=datetime.now().strftime("%Y-%m-%d_%H:%M:%S"),config=config,save_code=True)
     best_acc=0.0
     patience=10
-    for epoch in range(num_epochs):
+    for epoch in range(config["num_epochs"]):
         # 训练精确度的和，训练精确度的和中的示例数
         # 绝对误差的和，绝对误差的和中的示例数
-        print(f'Starting epoch {epoch + 1}/{num_epochs}...')
+        print(f'Starting epoch {epoch + 1}/{config["num_epochs"]}...')
         model.train()
         #target的shape为[图片数，边界框数，种类]
         loss_sum=0.0

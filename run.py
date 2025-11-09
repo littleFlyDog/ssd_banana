@@ -12,7 +12,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #超参数设置
 config={
     "batch_size": 32,
-    "learning_rate": 0.01,
+    "learning_rate": 0.001,
     "weight_decay": 5e-4,
     "num_epochs": 100,
 }
@@ -37,7 +37,7 @@ def calc_loss(cls_preds, cls_labels, bbox_preds,
 #------------------训练模型----------------------
 num_epochs = config["num_epochs"]
 model.to(device)
-train_fn(num_epochs, model, train_data, valid_data,trainer, calc_loss, device,config)
+train_fn( model, train_data, valid_data,trainer, calc_loss, device,config)
 
 
 

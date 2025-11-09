@@ -124,7 +124,7 @@ def box_iou(boxes1, boxes2):
     union_areas = areas1[:, None] + areas2 - inter_areas
     return inter_areas / union_areas
 #分配锚框，输入是标注的真实边界框和锚框返回一个张量，张量size为总锚框数，每个值为对应锚框分配的真实边界框索引，-1表示没有分配
-def assign_anchor_to_bbox(ground_truth, anchors, device, iou_threshold=0.5):
+def assign_anchor_to_bbox(ground_truth, anchors, device, iou_threshold=0.3):
     """将最接近的真实边界框分配给锚框"""
     num_anchors, num_gt_boxes = anchors.shape[0], ground_truth.shape[0]
     # 位于第i行和第j列的元素x_ij是锚框i和真实边界框j的IoU
